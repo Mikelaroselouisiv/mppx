@@ -11,7 +11,8 @@
     "start": "electron .",
     "prod": "npm run build && electron .",
     "setup": "npm run build && electron-builder --win --publish never",
-    "dist:win": "npm run setup"
+    "dist:win": "npm run setup",
+    "dist:mac": "npm run build && electron-builder --mac --publish never"
   },
   "keywords": [],
   "author": "",
@@ -36,6 +37,20 @@
       "electron/**/*",
       "package.json"
     ],
+    "mac": {
+      "icon": "public/favicon.png",
+      "category": "public.app-category.business",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        }
+      ],
+      "artifactName": "${productName}-${version}-${arch}.${ext}"
+    },
     "win": {
       "icon": "public/favicon.png",
       "target": [
