@@ -1,5 +1,17 @@
 /** Droits de navigation desktop selon le rôle utilisateur (chaîne API, insensible à la casse). */
 
+export type RecensementModuleId =
+  | 'PROJET_CONSTRUCTION'
+  | 'DOMAINE_ETAT'
+  | 'ENTREPRISE'
+  | 'ORGANISATION'
+  | 'COMMERCANT'
+  | 'LOGEMENT'
+  | 'ECOLE'
+  | 'EGLISE'
+  | 'CIMETIERE'
+  | 'JEUX_HASARD'
+
 export type NavAccess = {
   administration: boolean
   administrationUsers: boolean
@@ -9,10 +21,40 @@ export type NavAccess = {
   recensement: boolean
   /** Création / modification / suppression des fiches recensement (lecture seule pour inspecteur). */
   recensementWrite: boolean
+  /** null = tous les modules recensement ; sinon liste blanche par rôle métier. */
+  recensementModules: RecensementModuleId[] | null
   fiscalite: boolean
   recouvrement: boolean
   /** Carte des fiches recensées (points GPS). */
   geographicMonitor: boolean
+}
+
+/** Rubriques recensement du responsable urbanisme (accès recensement complet sur ces modules). */
+export const RESP_URBANISME_REC_MODULES: readonly RecensementModuleId[] = [
+  'PROJET_CONSTRUCTION',
+  'DOMAINE_ETAT',
+  'LOGEMENT',
+  'ECOLE',
+  'CIMETIERE',
+  'EGLISE',
+] as const
+
+const FULL_ACCESS_ROLES = new Set(['maire', 'directeur_general', 'administrateur', 'super_admin'])
+
+function fullNavAccess(): NavAccess {
+  return {
+    administration: true,
+    administrationUsers: true,
+    administrationRoles: true,
+    administrationMarches: true,
+    administrationCimetieres: true,
+    recensement: true,
+    recensementWrite: true,
+    recensementModules: null,
+    fiscalite: true,
+    recouvrement: true,
+    geographicMonitor: true,
+  }
 }
 
 export function normalizeDesktopRole(role: string): string {
@@ -35,20 +77,8 @@ export function normalizeDesktopRole(role: string): string {
 export function getNavAccess(role: string): NavAccess {
   const r = normalizeDesktopRole(role)
 
-  const fullAccess = new Set(['maire', 'directeur_general', 'administrateur', 'super_admin'])
-  if (fullAccess.has(r)) {
-    return {
-      administration: true,
-      administrationUsers: true,
-      administrationRoles: true,
-      administrationMarches: true,
-      administrationCimetieres: true,
-      recensement: true,
-      recensementWrite: true,
-      fiscalite: true,
-      recouvrement: true,
-      geographicMonitor: true,
-    }
+  if (FULL_ACCESS_ROLES.has(r)) {
+    return fullNavAccess()
   }
 
   if (r === 'ressources_humaines') {
@@ -60,6 +90,7 @@ export function getNavAccess(role: string): NavAccess {
       administrationCimetieres: false,
       recensement: false,
       recensementWrite: false,
+      recensementModules: null,
       fiscalite: false,
       recouvrement: false,
       geographicMonitor: false,
@@ -76,6 +107,7 @@ export function getNavAccess(role: string): NavAccess {
       administrationCimetieres: false,
       recensement: false,
       recensementWrite: false,
+      recensementModules: null,
       fiscalite: false,
       recouvrement: true,
       geographicMonitor: true,
@@ -92,6 +124,7 @@ export function getNavAccess(role: string): NavAccess {
       administrationCimetieres: false,
       recensement: false,
       recensementWrite: false,
+      recensementModules: null,
       fiscalite: true,
       recouvrement: true,
       geographicMonitor: true,
@@ -101,6 +134,8 @@ export function getNavAccess(role: string): NavAccess {
   const isInspector = r === 'inspecteur' || r.includes('inspecteur')
   const isResponsable = r.includes('responsable') || r.includes('resp_') || r.startsWith('resp')
   if (isInspector || isResponsable) {
+    const urbanismeModules =
+      r === 'resp_urbanisme' ? [...RESP_URBANISME_REC_MODULES] : null
     return {
       administration: false,
       administrationUsers: false,
@@ -109,6 +144,7 @@ export function getNavAccess(role: string): NavAccess {
       administrationCimetieres: false,
       recensement: true,
       recensementWrite: !isInspector,
+      recensementModules: urbanismeModules,
       fiscalite: false,
       recouvrement: false,
       geographicMonitor: true,
@@ -123,10 +159,20 @@ export function getNavAccess(role: string): NavAccess {
     administrationCimetieres: false,
     recensement: false,
     recensementWrite: false,
+    recensementModules: null,
     fiscalite: false,
     recouvrement: false,
     geographicMonitor: false,
   }
+}
+
+export function filterRecensementModules<T extends { id: RecensementModuleId }>(
+  modules: readonly T[],
+  allowed: RecensementModuleId[] | null,
+): T[] {
+  if (!allowed?.length) return [...modules]
+  const set = new Set(allowed)
+  return modules.filter((m) => set.has(m.id))
 }
 
 export function canAccessNavTab(tab: string, nav: NavAccess): boolean {

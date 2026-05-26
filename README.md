@@ -43,4 +43,4 @@ Sortie : `release/` (`.dmg` ou `.zip` selon la cible electron-builder).
 
 ## Version
 
-Voir `package.json` (actuellement 1.2.1).
+Voir `package.json` (actuellement 1.2.2).

@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
+import { getUserFacingApiMessage } from './apiErrors'
 import { S3ObjectImage } from './components/S3ObjectImage'
 import { buildGeoPopupHtml, presignPhotoUrl } from './geo/geoPopup'
 import {
@@ -10,13 +11,14 @@ import {
   type GeoMapPoint,
   type GeoMonitorModuleId,
 } from './geo/mapModules'
+import { filterRecensementModules, type RecensementModuleId } from './navAccess'
 
 function ErrorBox({ err }: { err: unknown }) {
   if (!err) return null
   return (
     <div className="card" style={{ borderColor: 'var(--danger)', marginBottom: 12 }}>
       <div style={{ fontWeight: 700, marginBottom: 6 }}>Erreur</div>
-      <div className="mono">{err instanceof Error ? err.message : String(err)}</div>
+      <div>{getUserFacingApiMessage(err)}</div>
     </div>
   )
 }
@@ -133,8 +135,18 @@ function GeoMap({
   return <div ref={containerRef} className="geo-map-canvas" />
 }
 
-export function GeographicMonitorPage() {
-  const [moduleId, setModuleId] = useState<GeoMonitorModuleId>('PROJET_CONSTRUCTION')
+export function GeographicMonitorPage({
+  allowedModules,
+}: {
+  allowedModules?: RecensementModuleId[] | null
+}) {
+  const visibleModules = useMemo(
+    () => filterRecensementModules(GEO_MONITOR_MODULES, allowedModules ?? null),
+    [allowedModules],
+  )
+  const [moduleId, setModuleId] = useState<GeoMonitorModuleId>(
+    () => (visibleModules[0]?.id as GeoMonitorModuleId | undefined) ?? 'PROJET_CONSTRUCTION',
+  )
   const [points, setPoints] = useState<GeoMapPoint[]>([])
   const [totalRows, setTotalRows] = useState(0)
   const [busy, setBusy] = useState(false)
@@ -142,7 +154,13 @@ export function GeographicMonitorPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [q, setQ] = useState('')
 
-  const mod = GEO_MONITOR_MODULES.find((m) => m.id === moduleId)!
+  const mod = visibleModules.find((m) => m.id === moduleId) ?? visibleModules[0]!
+
+  useEffect(() => {
+    if (!visibleModules.some((m) => m.id === moduleId)) {
+      setModuleId((visibleModules[0]?.id as GeoMonitorModuleId | undefined) ?? 'PROJET_CONSTRUCTION')
+    }
+  }, [visibleModules, moduleId])
 
   const load = async (id: GeoMonitorModuleId) => {
     setErr(null)
@@ -185,7 +203,7 @@ export function GeographicMonitorPage() {
       <div className="geo-monitor-body">
         <aside className="geo-monitor-sidebar">
           <div className="geo-monitor-modules">
-            {GEO_MONITOR_MODULES.map((m) => (
+            {visibleModules.map((m) => (
               <button
                 key={m.id}
                 type="button"

@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { ApiError, apiFetch, login, me as fetchMe, putBinary } from './api'
+import { getUserFacingApiMessage } from './apiErrors'
 import { assetUrl } from './assetUrl'
 import { EntityViewModal } from './components/EntityViewModal'
 import { ListToolbarCount } from './components/ListToolbarCount'
@@ -10,7 +11,7 @@ import { sortByCreatedAtDesc } from './fiscalite/sortByCreatedAt'
 import { FiscalitePage } from './FiscalitePage'
 import { GeographicMonitorPage } from './GeographicMonitorPage'
 import { RecouvrementPage } from './RecouvrementPage'
-import { canAccessNavTab, getNavAccess } from './navAccess'
+import { canAccessNavTab, filterRecensementModules, getNavAccess, type RecensementModuleId } from './navAccess'
 import { AppSettings, clearAuth, loadSettings, saveSettings } from './storage'
 
 type Tab =
@@ -31,21 +32,10 @@ function pretty(v: unknown) {
 
 function ErrorBox({ err }: { err: unknown }) {
   if (!err) return null
-  if (err instanceof ApiError) {
-    return (
-      <div className="card" style={{ borderColor: 'var(--danger)' }}>
-        <div style={{ fontWeight: 700, marginBottom: 6 }}>Erreur API</div>
-        <div className="mono">{err.message}</div>
-        <div className="mono" style={{ opacity: 0.8, marginTop: 8 }}>
-          status={err.status}
-        </div>
-      </div>
-    )
-  }
   return (
     <div className="card" style={{ borderColor: 'var(--danger)' }}>
       <div style={{ fontWeight: 700, marginBottom: 6 }}>Erreur</div>
-      <div className="mono">{String(err)}</div>
+      <div>{getUserFacingApiMessage(err)}</div>
     </div>
   )
 }
@@ -279,7 +269,10 @@ export function App() {
         <AdministrationCimetieresPage />
       ) : null}
       {isAuthed && tab === 'recensement' && canAccessNavTab(tab, navAccess) ? (
-        <RecensementPage canWrite={navAccess.recensementWrite} />
+        <RecensementPage
+          canWrite={navAccess.recensementWrite}
+          allowedModules={navAccess.recensementModules}
+        />
       ) : null}
       {isAuthed && tab === 'fiscalite' && canAccessNavTab(tab, navAccess) ? (
         <FiscalitePage canWriteRecensement={navAccess.recensementWrite} />
@@ -288,7 +281,7 @@ export function App() {
         <RecouvrementPage canWriteRecensement={navAccess.recensementWrite} />
       ) : null}
       {isAuthed && tab === 'geographic-monitor' && canAccessNavTab(tab, navAccess) ? (
-        <GeographicMonitorPage />
+        <GeographicMonitorPage allowedModules={navAccess.recensementModules} />
       ) : null}
     </div>
   )
@@ -1917,8 +1910,18 @@ function parseOptionalPositiveNumber(raw: unknown): number | null | 'invalid' {
   return n
 }
 
-function RecensementPage({ canWrite }: { canWrite: boolean }) {
-  const [moduleId, setModuleId] = useState<RecModuleId>('PROJET_CONSTRUCTION')
+function RecensementPage({
+  canWrite,
+  allowedModules,
+}: {
+  canWrite: boolean
+  allowedModules: RecensementModuleId[] | null
+}) {
+  const visibleModules = useMemo(
+    () => filterRecensementModules(RECENSEMENT_MODULES, allowedModules),
+    [allowedModules],
+  )
+  const [moduleId, setModuleId] = useState<RecModuleId>(() => visibleModules[0]?.id ?? 'PROJET_CONSTRUCTION')
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<unknown>(null)
   const [items, setItems] = useState<RecEntity[]>([])
@@ -1939,18 +1942,18 @@ function RecensementPage({ canWrite }: { canWrite: boolean }) {
   const [viewItem, setViewItem] = useState<RecEntity | null>(null)
   const [projectListStats, setProjectListStats] = useState({ total: 0, filtered: 0, busy: false })
 
+  useEffect(() => {
+    if (!visibleModules.some((m) => m.id === moduleId)) {
+      setModuleId(visibleModules[0]?.id ?? 'PROJET_CONSTRUCTION')
+    }
+  }, [visibleModules, moduleId])
+
+
   const load = async (kind = moduleId) => {
     setErr(null)
     setBusy(true)
     try {
       if (kind === 'PROJET_CONSTRUCTION') {
-        // handled by ConstructionProjectsPanel; keep here for shared ref loads only
-        const [marchesRes, cimetieresRes] = await Promise.all([
-          apiFetch<any>('/admin/marches'),
-          apiFetch<any>('/admin/cimetieres'),
-        ])
-        setMarches(normalizeRefs(marchesRes))
-        setCimetieres(normalizeRefs(cimetieresRes))
         setItems([])
         return
       }
@@ -1962,14 +1965,17 @@ function RecensementPage({ canWrite }: { canWrite: boolean }) {
       }
 
       const apiKind = kind === 'ORGANISATION' ? 'ORGANISATION' : kind
-      const [entitiesRes, marchesRes, cimetieresRes] = await Promise.all([
-        apiFetch<any>(`/recensement/entities?kind=${encodeURIComponent(apiKind)}`),
-        apiFetch<any>('/admin/marches'),
-        apiFetch<any>('/admin/cimetieres'),
-      ])
+      const needsMarches = kind === 'COMMERCANT'
+      const needsCimetieres = kind === 'CIMETIERE'
+      const jobs: Promise<unknown>[] = [apiFetch<any>(`/recensement/entities?kind=${encodeURIComponent(apiKind)}`)]
+      if (needsMarches) jobs.push(apiFetch<any>('/marches'))
+      if (needsCimetieres) jobs.push(apiFetch<any>('/cimetieres'))
+
+      const results = await Promise.all(jobs)
+      const entitiesRes = results[0]
       setItems(sortByCreatedAtDesc(normalizeRecEntities(entitiesRes)))
-      setMarches(normalizeRefs(marchesRes))
-      setCimetieres(normalizeRefs(cimetieresRes))
+      if (needsMarches) setMarches(normalizeRefs(results[1]))
+      if (needsCimetieres) setCimetieres(normalizeRefs(results[needsMarches ? 2 : 1]))
     } catch (e) {
       setErr(e)
     } finally {
@@ -2531,7 +2537,7 @@ function RecensementPage({ canWrite }: { canWrite: boolean }) {
         <aside style={{ borderRight: '1px solid rgba(0,0,0,0.08)', padding: 12, background: 'rgba(255,255,255,0.5)' }}>
           <div className="mono" style={{ opacity: 0.8, marginBottom: 10 }}>Modules</div>
           <div style={{ display: 'grid', gap: 8 }}>
-            {RECENSEMENT_MODULES.map((m) => (
+            {visibleModules.map((m) => (
               <button
                 key={m.id}
                 className={`btn ${moduleId === m.id ? 'primary' : ''}`}
