@@ -1,6 +1,6 @@
 {
   "name": "mairie-desktop",
-  "version": "1.2.2",
+  "version": "1.2.4",
   "description": "Poste de travail Mairie de Port-de-Paix (Electron)",
   "main": "electron/main.cjs",
   "scripts": {

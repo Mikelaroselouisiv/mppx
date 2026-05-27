@@ -9,7 +9,6 @@ const LB: Record<string, string> = {
   numero_dossier: 'N° dossier',
   denomination: 'Dénomination',
   designation: 'Désignation',
-  categorie: 'Catégorie',
   categorieTravail: 'Catégorie de travaux',
   statut: 'Statut',
   natureTravaux: 'Travaux / nature',
@@ -30,6 +29,30 @@ const LB: Record<string, string> = {
   proprietaire_cin: 'Propriétaire — CIN / NIN',
   proprietaireAdresse: 'Propriétaire — adresse',
   proprietaire_adresse: 'Propriétaire — adresse',
+  domaineCategorie: 'Catégorie (domaine)',
+  categorie: 'Catégorie (domaine)',
+  logementOccupation: 'Occupation',
+  logementMur: 'Nature des murs',
+  toilettesNombre: 'Toilettes — nombre',
+  toilettesNature: 'Toilettes — nature',
+  cuisinesNombre: 'Cuisines — nombre',
+  cuisinesNature: 'Cuisines — nature',
+  etagesNombre: 'Étages — nombre',
+  appartementsNombre: 'Appartements — nombre',
+  chambresNombre: 'Chambres — nombre',
+  garagesNombre: 'Garages — nombre',
+  salonsNombre: 'Salons — nombre',
+  balconsNombre: 'Balcons — nombre',
+  plancherNature: 'Nature du plancher',
+  toitureNatures: 'Nature de la toiture',
+  surfaceM2: 'Surface (m²)',
+  immeubleUsage: 'Usage de l’immeuble',
+  constructionType: 'Type de construction',
+  constructionTypePrecise: 'Type de construction (précision)',
+  elevesNombre: 'Élèves — nombre',
+  membresNombre: 'Membres — nombre',
+  sallesNombre: 'Salles — nombre',
+  sallesSuperficieM2: 'Salles — superficie (m²)',
   proprietaireNotes: 'Propriétaire — notes',
   affichageType: 'Type d’affichage',
   affichageLignes: 'Lignes d’affichage',
@@ -61,11 +84,47 @@ const LB: Record<string, string> = {
   updatedAt: 'Mis à jour le',
 }
 
-function str(v: unknown): string {
+function humanizeEnum(key: string, v: string): string {
+  const t = v.trim()
+  if (!t) return ''
+  const maps: Record<string, Record<string, string>> = {
+    categorie: {
+      PROPRIETE_BATIE: 'Propriété bâtie',
+      EMPLACEMENT: 'Emplacement / parcelle',
+    },
+    domaineCategorie: {
+      PROPRIETE_BATIE: 'Propriété bâtie',
+      EMPLACEMENT: 'Emplacement / parcelle',
+    },
+    logementOccupation: {
+      HABITE_PAR_PROPRIETAIRE: 'Habité par le propriétaire',
+      EN_FERMAGE: 'En fermage',
+      EN_LOCATION: 'En location',
+      EN_USUFRUIT: 'En usufruit',
+    },
+    logementMur: { BLOC: 'Bloc', BOIS: 'Bois', TOLE: 'Tôle' },
+    constructionType: {
+      BETON: 'Béton',
+      BOIS: 'Bois',
+      MIXTE: 'Mixte',
+      AUTRE: 'Autre',
+    },
+  }
+  return maps[key]?.[t] ?? t.replace(/_/g, ' ')
+}
+
+function strField(key: string, v: unknown): string {
   if (v == null) return ''
+  if (Array.isArray(v)) {
+    const parts = v.map((x) => strField(key, x)).filter(Boolean)
+    return parts.join(', ')
+  }
   if (typeof v === 'boolean') return v ? 'Oui' : 'Non'
   if (typeof v === 'number') return Number.isFinite(v) ? String(v) : ''
-  if (typeof v === 'string') return v.trim()
+  if (typeof v === 'string') {
+    const t = v.trim()
+    return humanizeEnum(key, t) || t
+  }
   return ''
 }
 
@@ -92,7 +151,8 @@ const PRIORITY: ReadonlyArray<[string, string]> = [
   ['designation', 'Désignation'],
   ['denomination', 'Dénomination'],
   ['kind', 'Type de fiche'],
-  ['categorie', 'Catégorie'],
+  ['categorie', 'Catégorie (domaine)'],
+  ['domaineCategorie', 'Catégorie (domaine)'],
   ['statut', 'Statut'],
   ['categorieTravail', 'Catégorie de travaux'],
   ['natureTravaux', 'Travaux / nature'],
@@ -127,6 +187,24 @@ const PRIORITY: ReadonlyArray<[string, string]> = [
   ['superficieConstruiteM2', 'Superficie construite (m²)'],
   ['niveauxNombre', 'Nombre de niveaux'],
   ['anneeConstruction', 'Année de construction'],
+  ['logementOccupation', 'Occupation'],
+  ['logementMur', 'Nature des murs'],
+  ['toilettesNombre', 'Toilettes — nombre'],
+  ['toilettesNature', 'Toilettes — nature'],
+  ['cuisinesNombre', 'Cuisines — nombre'],
+  ['cuisinesNature', 'Cuisines — nature'],
+  ['etagesNombre', 'Étages — nombre'],
+  ['appartementsNombre', 'Appartements — nombre'],
+  ['chambresNombre', 'Chambres — nombre'],
+  ['garagesNombre', 'Garages — nombre'],
+  ['salonsNombre', 'Salons — nombre'],
+  ['balconsNombre', 'Balcons — nombre'],
+  ['plancherNature', 'Nature du plancher'],
+  ['toitureNatures', 'Nature de la toiture'],
+  ['surfaceM2', 'Surface (m²)'],
+  ['immeubleUsage', 'Usage de l’immeuble'],
+  ['constructionType', 'Type de construction'],
+  ['constructionTypePrecise', 'Type de construction (précision)'],
   ['usageBatiment', 'Usage du bâtiment'],
   ['nomIngenieurArchitecte', 'Ingénieur ou architecte'],
   ['dureePermisConstruire', 'Durée du permis'],
@@ -147,7 +225,7 @@ export function buildRecensementDetailRows(raw: unknown): RecensementDetailRow[]
   for (const [key, label] of PRIORITY) {
     if (!(key in o)) continue
     used.add(key)
-    push(rows, label, str(o[key]))
+    push(rows, label, strField(key, o[key]))
   }
 
   const gps = o.gpsPoint ?? o.gps_point
@@ -186,7 +264,7 @@ export function buildRecensementDetailRows(raw: unknown): RecensementDetailRow[]
     const v = o[key]
     if (v === null || v === undefined) continue
     if (typeof v === 'object') continue
-    push(rows, LB[key] ?? key, str(v))
+    push(rows, LB[key] ?? key, strField(key, v))
   }
 
   return rows

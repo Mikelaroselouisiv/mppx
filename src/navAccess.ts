@@ -16,6 +16,8 @@ export type NavAccess = {
   administration: boolean
   administrationUsers: boolean
   administrationRoles: boolean
+  /** Création / suppression de codes rôles (catalogue) — super admin uniquement. */
+  administrationRolesWrite: boolean
   administrationMarches: boolean
   administrationCimetieres: boolean
   recensement: boolean
@@ -41,11 +43,13 @@ export const RESP_URBANISME_REC_MODULES: readonly RecensementModuleId[] = [
 
 const FULL_ACCESS_ROLES = new Set(['maire', 'directeur_general', 'administrateur', 'super_admin'])
 
-function fullNavAccess(): NavAccess {
+function fullNavAccess(role: string): NavAccess {
+  const r = normalizeDesktopRole(role)
   return {
     administration: true,
     administrationUsers: true,
     administrationRoles: true,
+    administrationRolesWrite: r === 'super_admin',
     administrationMarches: true,
     administrationCimetieres: true,
     recensement: true,
@@ -78,7 +82,7 @@ export function getNavAccess(role: string): NavAccess {
   const r = normalizeDesktopRole(role)
 
   if (FULL_ACCESS_ROLES.has(r)) {
-    return fullNavAccess()
+    return fullNavAccess(r)
   }
 
   if (r === 'ressources_humaines') {
@@ -86,6 +90,7 @@ export function getNavAccess(role: string): NavAccess {
       administration: true,
       administrationUsers: true,
       administrationRoles: true,
+      administrationRolesWrite: false,
       administrationMarches: false,
       administrationCimetieres: false,
       recensement: false,
@@ -103,6 +108,7 @@ export function getNavAccess(role: string): NavAccess {
       administration: false,
       administrationUsers: false,
       administrationRoles: false,
+      administrationRolesWrite: false,
       administrationMarches: false,
       administrationCimetieres: false,
       recensement: false,
@@ -120,6 +126,7 @@ export function getNavAccess(role: string): NavAccess {
       administration: false,
       administrationUsers: false,
       administrationRoles: false,
+      administrationRolesWrite: false,
       administrationMarches: false,
       administrationCimetieres: false,
       recensement: false,
@@ -140,6 +147,7 @@ export function getNavAccess(role: string): NavAccess {
       administration: false,
       administrationUsers: false,
       administrationRoles: false,
+      administrationRolesWrite: false,
       administrationMarches: false,
       administrationCimetieres: false,
       recensement: true,
@@ -155,6 +163,7 @@ export function getNavAccess(role: string): NavAccess {
     administration: false,
     administrationUsers: false,
     administrationRoles: false,
+    administrationRolesWrite: false,
     administrationMarches: false,
     administrationCimetieres: false,
     recensement: false,

@@ -260,7 +260,7 @@ export function App() {
         <AdministrationUsersPage />
       ) : null}
       {isAuthed && tab === 'administration-roles' && canAccessNavTab(tab, navAccess) ? (
-        <AdministrationRolesPage />
+        <AdministrationRolesPage canWriteCatalog={navAccess.administrationRolesWrite} />
       ) : null}
       {isAuthed && tab === 'administration-marches' && canAccessNavTab(tab, navAccess) ? (
         <AdministrationMarchesPage />
@@ -4234,7 +4234,7 @@ function ConstructionProjectsPanel({
   )
 }
 
-function AdministrationRolesPage() {
+function AdministrationRolesPage({ canWriteCatalog }: { canWriteCatalog: boolean }) {
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<unknown>(null)
   const [roles, setRoles] = useState<RoleItem[]>([])
@@ -4345,9 +4345,11 @@ function AdministrationRolesPage() {
           <button className="btn" onClick={load} disabled={busy}>
             Actualiser
           </button>
-          <button className="btn primary" onClick={openCreate} disabled={busy}>
-            Nouveau
-          </button>
+          {canWriteCatalog ? (
+            <button className="btn primary" onClick={openCreate} disabled={busy}>
+              Nouveau
+            </button>
+          ) : null}
         </div>
       </div>
 
@@ -4396,9 +4398,11 @@ function AdministrationRolesPage() {
                     {selected.code}
                   </div>
                   <div className="row">
-                    <button className="btn danger" onClick={() => void remove(selected)} disabled={busy || selected.isSystem}>
-                      Supprimer
-                    </button>
+                    {canWriteCatalog ? (
+                      <button className="btn danger" onClick={() => void remove(selected)} disabled={busy || selected.isSystem}>
+                        Supprimer
+                      </button>
+                    ) : null}
                   </div>
                 </div>
               ) : null}
